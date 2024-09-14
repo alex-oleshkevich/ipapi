@@ -6,7 +6,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/MadAppGang/httplog"
 	"github.com/oschwald/geoip2-golang"
 )
 
@@ -18,16 +20,22 @@ func getIP(r *http.Request) string {
 	return ip
 }
 
+type geoSubdivisionType struct {
+	Name string `json:"name"`
+	Code string `json:"iso"`
+}
+
 type geoIPType struct {
-	Country          string  `json:"country"`
-	CountryCode      string  `json:"country_code"`
-	City             string  `json:"city"`
-	Continent        string  `json:"continent"`
-	ContinentCode    string  `json:"continent_code"`
-	LocationAccuracy uint16  `json:"location_accuracy"`
-	Latitude         float64 `json:"latitude"`
-	Longitude        float64 `json:"longitude"`
-	TimeZone         string  `json:"time_zone"`
+	Continent        string               `json:"continent"`
+	ContinentCode    string               `json:"continent_code"`
+	Country          string               `json:"country"`
+	CountryCode      string               `json:"country_code"`
+	Subdivisions     []geoSubdivisionType `json:"subdivisions"`
+	City             string               `json:"city"`
+	LocationAccuracy uint16               `json:"location_accuracy"`
+	Latitude         float64              `json:"latitude"`
+	Longitude        float64              `json:"longitude"`
+	TimeZone         string               `json:"time_zone"`
 }
 
 func getGeoIP(db *geoip2.Reader, ip string) (geoIPType, error) {
@@ -36,10 +44,20 @@ func getGeoIP(db *geoip2.Reader, ip string) (geoIPType, error) {
 	if err != nil {
 		return geoIPType{}, err
 	}
+
+	subdivisions := make([]geoSubdivisionType, len(record.Subdivisions))
+	for i, subdivision := range record.Subdivisions {
+		subdivisions[i] = geoSubdivisionType{
+			Name: subdivision.Names["en"],
+			Code: subdivision.IsoCode,
+		}
+	}
+
 	return geoIPType{
 		Country:          record.Country.Names["en"],
 		CountryCode:      record.Country.IsoCode,
 		City:             record.City.Names["en"],
+		Subdivisions:     subdivisions,
 		Continent:        record.Continent.Names["en"],
 		ContinentCode:    record.Continent.Code,
 		LocationAccuracy: record.Location.AccuracyRadius,
@@ -65,7 +83,7 @@ type errorResponseType struct {
 func main() {
 	filePath := os.Getenv("GEOIP_DB_PATH")
 	if filePath == "" {
-		filePath = "GeoLite2-City.mmdb"
+		filePath = "data/GeoLite2-City.mmdb"
 	}
 	listenHost := os.Getenv("LISTEN_HOST")
 	if listenHost == "" {
@@ -114,7 +132,19 @@ func main() {
 		json.NewEncoder(w).Encode(response)
 	})
 
-	err = http.ListenAndServe(net.JoinHostPort(listenHost, listenPort), mux)
+	srv := &http.Server{
+		ReadTimeout:  120 * time.Second,
+		WriteTimeout: 120 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		Handler:      httplog.Logger(mux),
+	}
+
+	listener, err := net.Listen("tcp", net.JoinHostPort(listenHost, listenPort))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = http.Serve(listener, srv.Handler)
 	if err != nil {
 		log.Fatal(err)
 	}
