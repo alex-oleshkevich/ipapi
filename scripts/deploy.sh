@@ -12,11 +12,11 @@ LDFLAGS=(
   "-X '${PACKAGE}/pkg/version.BuildTime=${BUILD_TIMESTAMP}'"
 )
 
-# docker build --build-arg=GIT_COMMIT=$GIT_COMMIT -t $SERVICE_NAME -t $DOCKER_IMAGE .
-# docker push $DOCKER_IMAGE
+docker build --build-arg=GIT_COMMIT=$GIT_COMMIT -t $SERVICE_NAME -t $DOCKER_IMAGE .
+docker push $DOCKER_IMAGE
 
-# ssh alex@ssh.aresa.me docker pull $DOCKER_IMAGE
-# ssh alex@ssh.aresa.me docker volume create $SERVICE_NAME
+ssh alex@ssh.aresa.me docker pull $DOCKER_IMAGE
+ssh alex@ssh.aresa.me docker volume create $SERVICE_NAME
 ssh alex@ssh.aresa.me docker service rm $SERVICE_NAME || true
 ssh alex@ssh.aresa.me docker service create \
     --name $SERVICE_NAME \
