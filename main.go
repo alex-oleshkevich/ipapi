@@ -131,6 +131,14 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)
 	})
+	mux.HandleFunc("/request", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		r.Write(w)
+	})
+	mux.HandleFunc("/headers", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(r.Header)
+	})
 
 	srv := &http.Server{
 		ReadTimeout:  120 * time.Second,
